@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<title>Crossword</title>
+	<link type="text/css" rel="stylesheet" href="assets/materialize/css/materialize.min.css">
+	<style>
+	.filled{
+		border: black solid 1px;
+		border-radius: 20px;
+	}
+	.empty{
+		cursor: default;
+	}
+	.customFont{
+		font-family: myFont;
+		letter-spacing: 0.03em;
+		font-weight: bold;
+	}
+	::-webkit-input-placeholder { /* WebKit browsers */
+	    color:    #90a4ae;
+	}
+	:-moz-placeholder { /* Mozilla Firefox 4 to 18 */
+	   color:    #009688;
+	   opacity:  1;
+	}
+	::-moz-placeholder { /* Mozilla Firefox 19+ */
+	   color:    #009688;
+	   opacity:  1;
+	}
+	:-ms-input-placeholder { /* Internet Explorer 10+ */
+	   color:    #009688;
+	}
+	</style>
+	<script type="text/javascript" src="jquery.js"></script>
+	<script type="text/javascript" src="util.js"></script>
+	<script type="text/javascript" src="draw.js"></script>
+	<script type="text/javascript" src="assets/materialize/js/materialize.min.js"></script>
+</head>
+<body>
+	
+	<div class="customFont">
+		<div id="start" class="cyan lighten-4 hoverable">
+			<br/><br/><br/><br/><br/>
+			<h2 class="center-align teal-text">CROSSWORD GENERATOR</h2>
+			<h4 class="center-align teal-text">generate your own crossword puzzle</h4>
+			<br/><br/><br/><br/><br/>
+			<div class="row">
+				<div class="col offset-s5">
+					<button onclick="start()" class="center-block waves-effect waves-light btn" type="button">Let's Go</button>
+				</div>
+			</div>
+			<br/><br/><br/>
+		</div>
+	</div>
+	
+	<div class="container">
+			<div id="run" style='display:none'>
+				<div class="card cyan lighten-4">
+					<div class="card-content teal-text">
+						<span id="board"></span>
+					</div>
+					<div id="name" class="card-action cyan lighten-3">
+						<div class="row">
+							<div class="col offset-m3 offset-s2 offset-l4">
+								<a id="previous" onclick="prev()" class="waves-effect waves-light btn cyan lighten-4 teal-text">Previous</a>
+								<a id="next" onclick="next()" class="waves-effect waves-light btn cyan lighten-4 teal-text">Next</a>
+							</div>
+						</div>
+					</div>
+					<div class="card-action cyan lighten-3">
+						<div id="exec_time" class="teal-text"></div>
+						<div id="size" class="teal-text"></div>
+						<div id="total" class="teal-text"></div>
+					</div>
+				</div>
+				<div>
+					<div class="row">
+						<div class="input-field col s6">
+							<label for="textarea" class="teal-text">Textarea</label>
+				          	<textarea id="textarea" class="materialize-textarea teal-text"></textarea>
+						</div>
+						<div class="col s6">
+							<div>
+								<label class="customFont teal-text" for="time">Maximum time to search (seconds)</label>
+							</div>
+							<input class="customFont teal-text" style="margin-left:5%;width:10%" placeholder="5" type="text" name="time" id="time" /><br />
+						</div>	
+					</div>
+				</div>
+	
+				<button onclick="run()" id="generate" type="button" class="waves-effect waves-light btn">Generate</button>
+			</div>
+	</div>
+	<script>
+	
+	function start(){
+		$('#start').hide();
+		$('#run').show();
+	}
+	
+	var currentIndex = 0;
+	var defaultBoard = [
+	['.','.','.','.','.','.','.','.','.'],
+	['.','.','.','.','.','.','.','.','.'],
+	['C','R','O','S','S','.','.','.','.'],
+	['.','.','.','.','W','.','.','.','.'],
+	['.','.','.','.','O','.','.','.','.'],
+	['G','E','N','E','R','A','T','O','R'],
+	['.','.','.','.','D','.','.','.','.'],
+	['.','.','.','.','.','.','.','.','.'],
+	['.','.','.','.','.','.','.','.','.']
+	];
+	
+	finalDraw(0, "board");
+	
+	function returnValuesToDefault(){
+		wordsPosition = {};	
+		factor = 1;
+		currentIndex = 0;
+		BOARDSIZE = 0;
+		bestBoard = [];
+		finalBestBoard = [];
+		bestSize = 99999999;
+		visit = [];
+		wordStack = [];
+		wordsArray = [];
+		$('#generate').attr('disabled','disabled');
+		$('#previous').attr('disabled','disabled');
+		$('#next').attr('disabled','disabled');
+		$('#exec_time').empty();
+		$('#total').empty();
+		$('#size').empty();
+	}
+	
+	function run(){		
+		returnValuesToDefault();
+		
+		var lines = $('#textarea').val().split('\n');
+		var longestWidth = 0;
+		
+		if (lines.length === 1){
+			defaultBoard = [];
+			var temp = [];
+			var misc = [];
+			for (var i=0;i<lines[0].length;i++){
+				temp.push(lines[0][i].toUpperCase());
+				misc.push(".");
+			}
+			defaultBoard.push(temp);
+			for (var i=0;i<lines[0].length-1;i++){
+				defaultBoard.push(misc);
+			}
+			finalDraw(0, "board");
+			
+			$('#exec_time').html('Execution time: 0 ms.');
+			$('#total').html('Total : 1');
+			$('#size').html('Size: ' + lines[0].length + ' x 1');
+			$('#generate').removeAttr('disabled');
+			return;
+		}
+		
+		for(var i = 0;i < lines.length;i++){
+		    wordsArray.push(lines[i]);
+			longestWidth += lines[i].length;
+		}
+		BOARDSIZE = longestWidth;
+		board = initBoard(BOARDSIZE);
+		//printBoard([board]);
+		
+		for (var i=0;i<wordsArray.length;i++){
+			visit.push(0);
+		}
+		
+		start = new Date().getTime();
+		
+		if ($('#time').val() == ""){
+			time = 5000;
+		}else{
+			time = $('#time').val() * 1000 / factor;
+		}
+		
+		linkAllWords();
+		
+		//filter all bestBoard
+		filterBestBoard();
+		
+		//printBoard(bestBoard);
+		
+		finalDraw(currentIndex, "board");
+	
+		end = new Date().getTime();
+		var dur = end - start;
+		$('#exec_time').html('Execution time: ' + (dur / 1000) + ' ms.');
+		$('#total').html('Total : ' + bestBoard.length);
+		
+		if (bestBoard.length != 0){
+			var tt = boundingRectangleSize(bestBoard[currentIndex]);
+			var height = tt[1] - tt[0];
+			var width = tt[3] - tt[2];
+			$('#size').html('Size: ' + (width + 1) + ' x ' + (height + 1));
+		}
+		
+		$('#generate').removeAttr('disabled');
+		$('#previous').removeAttr('disabled');
+		$('#next').removeAttr('disabled');
+	}
+	
+	function prev(){
+		if (currentIndex - 1 >=0){
+			currentIndex--;
+			finalDraw(currentIndex, "board");
+			var tt = boundingRectangleSize(bestBoard[currentIndex]);
+			var height = tt[1] - tt[0];
+			var width = tt[3] - tt[2];
+		
+			$('#size').html('Size: ' + (width + 1) + ' x ' + (height + 1));
+		}
+	}
+	
+	function next(){
+		if (currentIndex + 1 < bestBoard.length){
+			currentIndex++;
+			finalDraw(currentIndex, "board");
+			var tt = boundingRectangleSize(bestBoard[currentIndex]);
+			var height = tt[1] - tt[0];
+			var width = tt[3] - tt[2];
+		
+			$('#size').html('Size: ' + (width + 1) + ' x ' + (height + 1));
+		}
+	}
+	
+	</script>
+</body>
+</html>
